@@ -27,6 +27,9 @@
   });
 
   function goToChapter(num, page) {
+    // Record the deliberate jump first so the reader resumes exactly here even
+    // though the cookie may point at a later chapter from a previous session.
+    setLastPosition(num, page || 1);
     let url = `reader.html?chapter=${num}`;
     if (page) url += `&page=${page}`;
     location.href = url;

@@ -205,6 +205,9 @@
 
   // --- Previous-chapter navigation (relative to the chapter in view) ---
   function goToChapter(num) {
+    // Record the deliberate jump first so a later reload resumes here, instead
+    // of the (possibly later) chapter the cookie was last advanced to.
+    setLastPosition(num, 1);
     location.href = `reader.html?chapter=${num}`;
   }
   function updateNav() {
@@ -269,12 +272,31 @@
 
   async function init() {
     await loadChapters();
-    let ch = getChapter(wantChapter) || CHAPTERS[0];
+
+    // Where do we resume? The URL's ?chapter is frozen at whatever chapter the
+    // reader was opened on — infinite scroll advances the saved cookie position
+    // but never the URL. So on a reload (e.g. the browser discarded the tab while
+    // you were away) the URL may point "behind" where you actually were.
+    // Rule: trust the URL only when it agrees with the saved position OR was an
+    // explicit jump (deliberate jumps write the cookie before navigating, see
+    // goToChapter). Otherwise the URL is stale → resume from the cookie.
+    const last = getLastPosition();
+    let ch, page;
+    if (wantChapter && getChapter(wantChapter) && (!last || last.chapter === wantChapter)) {
+      ch = getChapter(wantChapter);
+      page = startPage || (last && last.page) || 1;
+    } else if (last && getChapter(last.chapter)) {
+      ch = getChapter(last.chapter);
+      page = last.page || 1;
+    } else {
+      ch = getChapter(wantChapter) || CHAPTERS[0];
+      page = startPage || 1;
+    }
     currentVisible = ch.num;
 
     await renderChapter(ch, true);
     renderFooter();
-    setLastPosition(ch.num, startPage || 1);
+    setLastPosition(ch.num, page);
     nowReading.textContent = chapterLabel(ch.num);
 
     buildDrawer();
@@ -284,10 +306,10 @@
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", maybeAppend);
 
-    if (startPage > 1) {
+    if (page > 1) {
       requestAnimationFrame(() => {
         const target = reader.querySelector(
-          `.page-img[data-chapter="${ch.num}"][data-page="${startPage}"]`
+          `.page-img[data-chapter="${ch.num}"][data-page="${page}"]`
         );
         if (target) target.scrollIntoView();
       });
