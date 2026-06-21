@@ -6,7 +6,8 @@
   <title>Hoa Sơn Tái Khởi — Đọc Truyện Online</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="reading">
+  <canvas id="petals" aria-hidden="true"></canvas>
   <header class="topbar">
     <div class="brand">Hoa Sơn <span>Tái Khởi</span></div>
     <div class="spacer"></div>
@@ -16,7 +17,7 @@
 
   <main class="wrap">
     <section class="hero">
-      <div class="cover" id="cover"></div>
+      <div class="cover" id="cover"><img id="coverImg" alt="Bìa Hoa Sơn Tái Khởi" /></div>
       <div>
         <h1 id="title"></h1>
         <p class="alt" id="altTitle"></p>
@@ -38,12 +39,18 @@
       <div class="stat" id="percentLabel">0%</div>
     </div>
 
-    <div class="section-title">Danh sách chương</div>
+    <div class="section-title">
+      Danh sách chương
+      <input id="search" class="search-input" type="search"
+             placeholder="Tìm theo số chương hoặc tên… (vd: 202)" />
+    </div>
+    <div class="list-note" id="listNote"></div>
     <div class="chapter-grid" id="chapterGrid"></div>
   </main>
 
   <script src="data.js"></script>
   <script src="tracker.js"></script>
+  <script src="petals.js"></script>
   <script src="home.js"></script>
 </body>
 </html>

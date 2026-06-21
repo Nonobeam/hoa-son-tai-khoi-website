@@ -1,6 +1,8 @@
-// Reader with infinite scroll. When the reader scrolls past ~80% of the
-// last-loaded chapter, the next chapter is appended below so reading is
-// continuous — no "next page" click needed. Progress is saved to cookies.
+// Reader with infinite scroll. Chapters are either text (HTML fragment in
+// content/<num>.html) or scanned images (content/img/<num>/*.jpg). When the
+// reader scrolls past ~80% of the loaded content, the next chapter is fetched
+// and appended below — continuous reading, no "next page" click. Progress is
+// persisted to cookies (tracker.js).
 
 (function () {
   const reader = document.getElementById("reader");
@@ -9,59 +11,53 @@
   const toTop = document.getElementById("toTop");
 
   const params = new URLSearchParams(location.search);
-  let startChapter = Number(params.get("chapter")) || CHAPTERS[0].id;
+  const wantChapter = Number(params.get("chapter"));
   const startPage = Number(params.get("page")) || 0;
 
-  if (!getChapter(startChapter)) startChapter = CHAPTERS[0].id;
-
-  const APPEND_THRESHOLD = 0.8; // append next chapter at 80% of current one
-  let loadedChapters = []; // ids in render order
+  const APPEND_THRESHOLD = 0.8; // append next chapter at 80% scroll of loaded content
+  let loaded = []; // chapter numbers in render order
   let appending = false;
-  let currentVisibleChapter = startChapter;
+  let currentVisible = null;
 
-  // --- Render a single chapter block ---
-  function renderChapter(ch, isFirst) {
+  // --- Build the DOM for one chapter and append it ---
+  async function renderChapter(ch, isFirst) {
     const block = document.createElement("section");
     block.className = "chapter-block";
-    block.dataset.chapter = ch.id;
+    block.dataset.chapter = ch.num;
 
     const heading = document.createElement("div");
-    heading.className = isFirst ? "chapter-heading" : "chapter-heading";
-    heading.textContent = `${ch.title} — Hoa Sơn Tái Khởi`;
+    heading.className = "chapter-heading";
+    heading.textContent = ch.title;
     block.appendChild(heading);
 
-    for (let p = 1; p <= ch.pages; p++) {
-      const img = document.createElement("img");
-      img.className = "page-img";
-      img.loading = "lazy";
-      img.alt = `${ch.title} - trang ${p}`;
-      img.dataset.chapter = ch.id;
-      img.dataset.page = p;
-      img.src = makePageDataUri(ch.number, p);
-      block.appendChild(img);
-    }
-    reader.appendChild(block);
-    loadedChapters.push(ch.id);
-  }
-
-  // --- Loader element shown while waiting for next chapter ---
-  function renderLoaderOrEnd() {
-    removeFooter();
-    const lastId = loadedChapters[loadedChapters.length - 1];
-    const next = getNextChapter(lastId);
-    const footer = document.createElement("div");
-    footer.id = "reader-footer";
-    if (next) {
-      footer.className = "loader";
-      footer.innerHTML =
-        `<div class="spinner"></div>Đang tải ${next.title}…`;
+    if (ch.type === "image") {
+      ch.files.forEach((fn, i) => {
+        const img = document.createElement("img");
+        img.className = "page-img";
+        img.loading = "lazy";
+        img.alt = `${ch.title} - trang ${i + 1}`;
+        img.dataset.chapter = ch.num;
+        img.dataset.page = i + 1;
+        img.src = `content/img/${ch.num}/${fn}`;
+        block.appendChild(img);
+      });
     } else {
-      footer.className = "end-note";
-      footer.innerHTML =
-        `🎉 Bạn đã đọc tới chương mới nhất.<br/>` +
-        `<a class="btn btn-ghost" style="margin-top:14px" href="index.html">Về mục lục</a>`;
+      const body = document.createElement("article");
+      body.className = "chapter-text";
+      body.dataset.chapter = ch.num;
+      try {
+        const res = await fetch(`content/${ch.num}.html`);
+        body.innerHTML = res.ok
+          ? await res.text()
+          : `<p class="end-note">Không tải được nội dung chương ${ch.num}.</p>`;
+      } catch (e) {
+        body.innerHTML = `<p class="end-note">Lỗi tải chương ${ch.num}.</p>`;
+      }
+      block.appendChild(body);
     }
-    reader.appendChild(footer);
+
+    reader.appendChild(block);
+    loaded.push(ch.num);
   }
 
   function removeFooter() {
@@ -69,104 +65,108 @@
     if (f) f.remove();
   }
 
-  // --- Append the next chapter ---
-  function appendNextChapter() {
-    if (appending) return;
-    const lastId = loadedChapters[loadedChapters.length - 1];
-    const next = getNextChapter(lastId);
-    if (!next) return;
-
-    appending = true;
+  function renderFooter() {
     removeFooter();
-    // tiny delay so the loader is perceptible and layout settles
-    setTimeout(() => {
-      renderChapter(next, false);
-      renderLoaderOrEnd();
-      appending = false;
-      // a second append may already be needed on very tall screens
-      maybeAppend();
-    }, 350);
+    const next = getNextChapter(loaded[loaded.length - 1]);
+    const footer = document.createElement("div");
+    footer.id = "reader-footer";
+    if (next) {
+      footer.className = "loader";
+      footer.innerHTML = `<div class="spinner"></div>Đang tải ${next.title.split("—")[0].trim()}…`;
+    } else {
+      footer.className = "end-note";
+      footer.innerHTML =
+        `🎉 Bạn đã đọc tới chương mới nhất hiện có.<br/>` +
+        `<a class="btn btn-ghost" style="margin-top:14px" href="index.html">Về mục lục</a>`;
+    }
+    reader.appendChild(footer);
   }
 
-  // --- Decide whether we are near the end and should append ---
+  async function appendNextChapter() {
+    if (appending) return;
+    const next = getNextChapter(loaded[loaded.length - 1]);
+    if (!next) return;
+    appending = true;
+    removeFooter();
+    const loading = document.createElement("div");
+    loading.id = "reader-footer";
+    loading.className = "loader";
+    loading.innerHTML = `<div class="spinner"></div>Đang tải ${next.title.split("—")[0].trim()}…`;
+    reader.appendChild(loading);
+
+    await renderChapter(next, false);
+    renderFooter();
+    appending = false;
+    maybeAppend(); // tall viewport may need another
+  }
+
   function maybeAppend() {
     if (appending) return;
     const doc = document.documentElement;
     const scrollBottom = window.scrollY + window.innerHeight;
     const total = doc.scrollHeight;
-    if (total <= 0) return;
-    // append when within (1 - threshold) of the very bottom of loaded content
-    if (scrollBottom >= total * APPEND_THRESHOLD) {
+    if (total > 0 && scrollBottom >= total * APPEND_THRESHOLD) {
       appendNextChapter();
     }
   }
 
-  // --- Track which chapter is currently in view + reading progress ---
   function updateReadingState() {
-    // top reading-progress bar across all loaded content
     const doc = document.documentElement;
     const max = doc.scrollHeight - window.innerHeight;
     const pct = max > 0 ? Math.min(100, (window.scrollY / max) * 100) : 0;
     progressBar.style.width = pct + "%";
-
     toTop.classList.toggle("show", window.scrollY > 800);
 
-    // find the chapter block whose top is closest above the viewport center
     const blocks = reader.querySelectorAll(".chapter-block");
     const probe = window.scrollY + window.innerHeight * 0.35;
-    let visible = currentVisibleChapter;
+    let visible = currentVisible;
     blocks.forEach((b) => {
       if (b.offsetTop <= probe) visible = Number(b.dataset.chapter);
     });
 
-    if (visible !== currentVisibleChapter) {
-      // moved into a new chapter -> the previous one is considered read
-      onChapterChanged(visible);
+    if (visible !== currentVisible && visible != null) {
+      markEarlierRead(visible);
+      currentVisible = visible;
+      nowReading.textContent = chapterLabel(visible);
     }
-    currentVisibleChapter = visible;
 
-    nowReading.textContent = `Chương ${visible}`;
-
-    // save approximate page position for resume
-    const visImg = getApproxVisiblePage();
-    if (visImg) {
-      setLastPosition(visImg.chapter, visImg.page);
-    }
+    const pos = approxVisiblePage();
+    if (pos) setLastPosition(pos.chapter, pos.page);
   }
 
-  function onChapterChanged(newChapter) {
-    // mark every chapter before the new one as fully read
-    const idx = CHAPTERS.findIndex((c) => c.id === newChapter);
+  function chapterLabel(num) {
+    const ch = getChapter(num);
+    return ch ? `Chương ${num}` : "";
+  }
+
+  function markEarlierRead(newChapter) {
+    const idx = chapterIndex(newChapter);
     for (let i = 0; i < idx; i++) {
-      if (loadedChapters.includes(CHAPTERS[i].id)) {
-        markChapterRead(CHAPTERS[i].id);
-      }
+      if (loaded.includes(CHAPTERS[i].num)) markChapterRead(CHAPTERS[i].num);
     }
   }
 
-  function getApproxVisiblePage() {
+  function approxVisiblePage() {
     const center = window.scrollY + window.innerHeight * 0.4;
     const imgs = reader.querySelectorAll(".page-img");
     let best = null;
     imgs.forEach((img) => {
-      if (img.offsetTop <= center) {
+      if (img.offsetTop <= center)
         best = { chapter: Number(img.dataset.chapter), page: Number(img.dataset.page) };
-      }
     });
+    // for text chapters, fall back to the chapter currently in view
+    if (!best && currentVisible != null) best = { chapter: currentVisible, page: 1 };
     return best;
   }
 
-  // --- Mark the last loaded chapter read when user reaches the end ---
   function markFinalIfAtEnd() {
     const doc = document.documentElement;
     if (window.scrollY + window.innerHeight >= doc.scrollHeight - 60) {
-      const lastId = loadedChapters[loadedChapters.length - 1];
-      // if there's no next chapter, finishing the scroll means it's read
+      const lastId = loaded[loaded.length - 1];
       if (!getNextChapter(lastId)) markChapterRead(lastId);
     }
   }
 
-  // --- Scroll handling (throttled with rAF) ---
   let ticking = false;
   function onScroll() {
     if (ticking) return;
@@ -181,29 +181,31 @@
 
   toTop.onclick = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-  // --- Init ---
-  function init() {
-    const ch = getChapter(startChapter);
-    renderChapter(ch, true);
-    renderLoaderOrEnd();
-    setLastPosition(ch.id, startPage || 1);
-    nowReading.textContent = `Chương ${ch.id}`;
+  async function init() {
+    await loadChapters();
+    let ch = getChapter(wantChapter) || CHAPTERS[0];
+    currentVisible = ch.num;
+
+    await renderChapter(ch, true);
+    renderFooter();
+    setLastPosition(ch.num, startPage || 1);
+    nowReading.textContent = chapterLabel(ch.num);
 
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", maybeAppend);
 
-    // jump to requested page after images have a size
     if (startPage > 1) {
       requestAnimationFrame(() => {
         const target = reader.querySelector(
-          `.page-img[data-chapter="${startChapter}"][data-page="${startPage}"]`
+          `.page-img[data-chapter="${ch.num}"][data-page="${startPage}"]`
         );
         if (target) target.scrollIntoView();
       });
     }
-    // in case the first chapter is shorter than the viewport
-    setTimeout(maybeAppend, 400);
+    setTimeout(maybeAppend, 400); // first chapter shorter than viewport
   }
 
-  init();
+  init().catch((err) => {
+    reader.innerHTML = `<div class="end-note">Lỗi: ${err.message}<br/>Hãy chạy qua server (xem README).</div>`;
+  });
 })();

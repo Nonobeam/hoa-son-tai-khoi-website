@@ -1,11 +1,12 @@
-// Manga metadata and chapter list for "Hoa Sơn Tái Khởi".
-// No backend: chapters are defined here and page images are generated
-// on the fly (see page.js) so the whole thing runs from the filesystem.
+// Manga/novel metadata + chapter index loader for "Hoa Sơn Tái Khởi".
+// The real chapter list lives in content/chapters.json (built by extract.py
+// from the provided PDF/DOCX files). No backend — just static JSON + files.
 
 const MANGA = {
   title: "Hoa Sơn Tái Khởi",
-  altTitle: "Return of the Mount Hua Sect",
-  author: "BiJ / LICO",
+  cover: "5698-hoa-son-tai-khoi-1.webp",
+  altTitle: "Return of the Mount Hua Sect / 화산귀환",
+  author: "Bich Hwa Ban / LICO",
   synopsis:
     "Sau khi đánh bại Thiên Ma và hy sinh thân mình, Đại hiệp Thanh Mai Kiếm Tôn " +
     "Trần Trường Sinh của phái Hoa Sơn tỉnh dậy sau một trăm năm trong thân xác " +
@@ -15,31 +16,33 @@ const MANGA = {
   status: "Đang tiến hành",
 };
 
-// Generate a chapter list. Each chapter has a deterministic page count so the
-// generated placeholder pages stay stable across reloads.
-const CHAPTERS = Array.from({ length: 24 }, (_, i) => {
-  const num = i + 1;
-  const pages = 8 + ((num * 7) % 9); // 8..16 pages, stable per chapter
-  return {
-    id: num,
-    number: num,
-    title: `Chương ${num}`,
-    pages,
-  };
-});
+// Populated by loadChapters(). Each item: {num, title, type:'text'|'image', ...}
+let CHAPTERS = [];
+let _byNum = new Map();
 
-function getChapter(id) {
-  return CHAPTERS.find((c) => c.id === Number(id)) || null;
+async function loadChapters() {
+  if (CHAPTERS.length) return CHAPTERS;
+  const res = await fetch("content/chapters.json");
+  if (!res.ok) throw new Error("Không tải được danh sách chương");
+  CHAPTERS = await res.json();
+  _byNum = new Map(CHAPTERS.map((c) => [c.num, c]));
+  return CHAPTERS;
 }
 
-function getNextChapter(id) {
-  const idx = CHAPTERS.findIndex((c) => c.id === Number(id));
-  if (idx === -1 || idx === CHAPTERS.length - 1) return null;
-  return CHAPTERS[idx + 1];
+function getChapter(num) {
+  return _byNum.get(Number(num)) || null;
 }
 
-function getPrevChapter(id) {
-  const idx = CHAPTERS.findIndex((c) => c.id === Number(id));
-  if (idx <= 0) return null;
-  return CHAPTERS[idx - 1];
+function chapterIndex(num) {
+  return CHAPTERS.findIndex((c) => c.num === Number(num));
+}
+
+function getNextChapter(num) {
+  const i = chapterIndex(num);
+  return i === -1 || i === CHAPTERS.length - 1 ? null : CHAPTERS[i + 1];
+}
+
+function getPrevChapter(num) {
+  const i = chapterIndex(num);
+  return i <= 0 ? null : CHAPTERS[i - 1];
 }

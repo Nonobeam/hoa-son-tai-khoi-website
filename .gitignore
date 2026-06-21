@@ -1,0 +1,15 @@
+# Raw source archives (re-extract into content/ with extract.py + ocr.py)
+drive-download-*/
+*.docx
+*.pdf
+
+# Downloaded OCR model (re-download to re-run ocr.py)
+tessdata/
+
+# Temp / logs / cache
+*.err
+__pycache__/
+content/img/
+.DS_Store
+.idea/
+.vscode/
