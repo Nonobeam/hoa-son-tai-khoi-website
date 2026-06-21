@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Đang đọc — Hoa Sơn Tái Khởi</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="reading">
+  <canvas id="petals" aria-hidden="true"></canvas>
+  <div class="read-progress" id="readProgress"></div>
+
+  <header class="topbar">
+    <a class="brand" href="index.html">Hoa Sơn <span>Tái Khởi</span></a>
+    <div class="spacer"></div>
+    <span class="stat" id="nowReading" style="color:var(--muted);font-size:14px"></span>
+    <a class="nav-btn" href="index.html">☰ Mục lục</a>
+  </header>
+
+  <main class="reader" id="reader"></main>
+
+  <button class="to-top" id="toTop" title="Lên đầu trang">↑</button>
+
+  <script src="data.js"></script>
+  <script src="page.js"></script>
+  <script src="tracker.js"></script>
+  <script src="petals.js"></script>
+  <script src="reader.js"></script>
+</body>
+</html>

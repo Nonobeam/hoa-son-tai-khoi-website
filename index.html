@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hoa Sơn Tái Khởi — Đọc Truyện Online</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Hoa Sơn <span>Tái Khởi</span></div>
+    <div class="spacer"></div>
+    <button class="nav-btn" id="continueBtn" style="display:none">Đọc tiếp ▸</button>
+    <button class="nav-btn danger" id="resetBtn">Xóa lịch sử</button>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <div class="cover" id="cover"></div>
+      <div>
+        <h1 id="title"></h1>
+        <p class="alt" id="altTitle"></p>
+        <p class="meta">
+          Tác giả: <b id="author"></b> · Trạng thái: <b id="status"></b>
+        </p>
+        <div class="genres" id="genres"></div>
+        <p class="synopsis" id="synopsis"></p>
+        <div class="cta-row">
+          <button class="btn btn-primary" id="startBtn">Đọc từ đầu</button>
+          <button class="btn btn-ghost" id="resumeBtn" style="display:none"></button>
+        </div>
+      </div>
+    </section>
+
+    <div class="summary">
+      <div class="stat">Tiến độ: <b id="readNum">0</b>/<b id="totalNum">0</b> chương</div>
+      <div class="bar"><i id="progressFill"></i></div>
+      <div class="stat" id="percentLabel">0%</div>
+    </div>
+
+    <div class="section-title">Danh sách chương</div>
+    <div class="chapter-grid" id="chapterGrid"></div>
+  </main>
+
+  <script src="data.js"></script>
+  <script src="tracker.js"></script>
+  <script src="home.js"></script>
+</body>
+</html>
