@@ -9,6 +9,13 @@
   const progressBar = document.getElementById("readProgress");
   const nowReading = document.getElementById("nowReading");
   const toTop = document.getElementById("toTop");
+  const prevBtn = document.getElementById("prevBtn");
+  const menuBtn = document.getElementById("menuBtn");
+  const drawer = document.getElementById("drawer");
+  const drawerOverlay = document.getElementById("drawerOverlay");
+  const drawerClose = document.getElementById("drawerClose");
+  const drawerSearch = document.getElementById("drawerSearch");
+  const drawerList = document.getElementById("drawerList");
 
   const params = new URLSearchParams(location.search);
   const wantChapter = Number(params.get("chapter"));
@@ -128,6 +135,7 @@
       markEarlierRead(visible);
       currentVisible = visible;
       nowReading.textContent = chapterLabel(visible);
+      updateNav();
     }
 
     const pos = approxVisiblePage();
@@ -181,6 +189,84 @@
 
   toTop.onclick = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
+  // --- Reading font size (persisted in a cookie) ---
+  const fontDown = document.getElementById("fontDown");
+  const fontUp = document.getElementById("fontUp");
+  function applyFontSize() {
+    const px = getFontSize();
+    document.documentElement.style.setProperty("--reader-font", px + "px");
+  }
+  function changeFont(delta) {
+    const next = setFontSize(getFontSize() + delta);
+    document.documentElement.style.setProperty("--reader-font", next + "px");
+  }
+  fontDown.onclick = () => changeFont(-1);
+  fontUp.onclick = () => changeFont(1);
+
+  // --- Previous-chapter navigation (relative to the chapter in view) ---
+  function goToChapter(num) {
+    location.href = `reader.html?chapter=${num}`;
+  }
+  function updateNav() {
+    const prev = getPrevChapter(currentVisible);
+    prevBtn.disabled = !prev;
+    prevBtn.style.opacity = prev ? "1" : "0.4";
+    prevBtn.title = prev ? `Chương ${prev.num}` : "Đã ở chương đầu";
+    updateDrawerActive();
+  }
+  prevBtn.onclick = () => {
+    const prev = getPrevChapter(currentVisible);
+    if (prev) goToChapter(prev.num);
+  };
+
+  // --- Chapter drawer (table of contents) ---
+  function buildDrawer() {
+    const frag = document.createDocumentFragment();
+    CHAPTERS.forEach((ch) => {
+      const item = document.createElement("div");
+      item.className = "drawer-item" + (isChapterRead(ch.num) ? " read" : "");
+      item.dataset.chapter = ch.num;
+      item.textContent = ch.title;
+      item.title = ch.title;
+      item.onclick = () => {
+        if (ch.num === currentVisible) closeDrawer();
+        else goToChapter(ch.num);
+      };
+      frag.appendChild(item);
+    });
+    drawerList.appendChild(frag);
+  }
+  function updateDrawerActive() {
+    drawerList.querySelectorAll(".drawer-item").forEach((el) => {
+      el.classList.toggle("current", Number(el.dataset.chapter) === currentVisible);
+    });
+  }
+  function openDrawer() {
+    drawer.classList.add("open");
+    drawerOverlay.classList.add("open");
+    updateDrawerActive();
+    const active = drawerList.querySelector(".drawer-item.current");
+    if (active) active.scrollIntoView({ block: "center" });
+  }
+  function closeDrawer() {
+    drawer.classList.remove("open");
+    drawerOverlay.classList.remove("open");
+  }
+  menuBtn.onclick = () =>
+    drawer.classList.contains("open") ? closeDrawer() : openDrawer();
+  drawerClose.onclick = closeDrawer;
+  drawerOverlay.onclick = closeDrawer;
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeDrawer();
+  });
+  drawerSearch.addEventListener("input", () => {
+    const q = drawerSearch.value.trim().toLowerCase();
+    drawerList.querySelectorAll(".drawer-item").forEach((el) => {
+      const hay = (el.textContent + " " + el.dataset.chapter).toLowerCase();
+      el.style.display = !q || hay.includes(q) ? "" : "none";
+    });
+  });
+
   async function init() {
     await loadChapters();
     let ch = getChapter(wantChapter) || CHAPTERS[0];
@@ -190,6 +276,10 @@
     renderFooter();
     setLastPosition(ch.num, startPage || 1);
     nowReading.textContent = chapterLabel(ch.num);
+
+    buildDrawer();
+    updateNav();
+    applyFontSize();
 
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", maybeAppend);

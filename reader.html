@@ -13,9 +13,27 @@
   <header class="topbar">
     <a class="brand" href="index.html">Hoa Sơn <span>Tái Khởi</span></a>
     <div class="spacer"></div>
-    <span class="stat" id="nowReading" style="color:var(--muted);font-size:14px"></span>
-    <a class="nav-btn" href="index.html">☰ Mục lục</a>
+    <button class="nav-btn" id="prevBtn" title="Chương trước">
+      <span class="ic">‹</span><span class="lbl"> Chương trước</span>
+    </button>
+    <span class="stat now-reading" id="nowReading"></span>
+    <button class="nav-btn icon-btn" id="fontDown" title="Giảm cỡ chữ">A−</button>
+    <button class="nav-btn icon-btn" id="fontUp" title="Tăng cỡ chữ">A+</button>
+    <button class="nav-btn" id="menuBtn" title="Mục lục">
+      <span class="ic">☰</span><span class="lbl"> Mục lục</span>
+    </button>
   </header>
+
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+  <aside class="drawer" id="drawer" aria-label="Mục lục">
+    <div class="drawer-head">
+      <strong>Mục lục</strong>
+      <button class="drawer-close" id="drawerClose" title="Đóng">✕</button>
+    </div>
+    <input class="drawer-search" id="drawerSearch" type="search"
+           placeholder="Tìm chương… (vd 202)" />
+    <div class="drawer-list" id="drawerList"></div>
+  </aside>
 
   <main class="reader" id="reader"></main>
 

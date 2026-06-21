@@ -77,3 +77,20 @@ function clearProgress() {
 function readCount() {
   return Object.keys(loadProgress().read).length;
 }
+
+// --- Reading font size (separate cookie) ---
+const FONT_COOKIE = "hstk_fontsize";
+const FONT_MIN = 14;
+const FONT_MAX = 30;
+const FONT_DEFAULT = 18;
+
+function getFontSize() {
+  const v = parseInt(getCookie(FONT_COOKIE), 10);
+  return v >= FONT_MIN && v <= FONT_MAX ? v : FONT_DEFAULT;
+}
+
+function setFontSize(px) {
+  const clamped = Math.max(FONT_MIN, Math.min(FONT_MAX, px));
+  setCookie(FONT_COOKIE, String(clamped), COOKIE_DAYS);
+  return clamped;
+}
