@@ -4,7 +4,7 @@
 
 const MANGA = {
   title: "Hoa Sơn Tái Khởi",
-  cover: "5698-hoa-son-tai-khoi-1.webp",
+  cover: "assets/cover.webp",
   altTitle: "Return of the Mount Hua Sect / 화산귀환",
   author: "Bich Hwa Ban / LICO",
   synopsis:
