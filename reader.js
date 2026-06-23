@@ -427,21 +427,19 @@
 
   tagPopup.addEventListener("click", () => {
     interactingWithPopup = false;
-    if (!pendingRange) return;
-    const container = closestChapterText(pendingRange.startContainer);
-    if (!container) {
-      hideTagPopup();
-      return;
-    }
-    const chapter = Number(container.dataset.chapter);
-    const MAX_LEN = 80;
-    let snippet = pendingRange.toString().replace(/\s+/g, " ").trim();
+    const range = pendingRange;
+    if (!range) return;
+    const container = closestChapterText(range.startContainer);
     hideTagPopup();
     window.getSelection().removeAllRanges();
+    if (!container) return;
+    const chapter = Number(container.dataset.chapter);
+    const MAX_LEN = 80;
+    let snippet = range.toString().replace(/\s+/g, " ").trim();
     if (!snippet) return;
     if (snippet.length > MAX_LEN) snippet = snippet.slice(0, MAX_LEN);
     const { nodes, fullText } = buildTextWalk(container);
-    const startOffset = globalOffset(nodes, pendingRange.startContainer, pendingRange.startOffset);
+    const startOffset = globalOffset(nodes, range.startContainer, range.startOffset);
     const occurrence = startOffset == null ? 0 : countOccurrencesBefore(fullText, snippet, startOffset);
     setTag({ chapter, snippet, occurrence });
     showToast("Đã thêm đánh dấu.");
