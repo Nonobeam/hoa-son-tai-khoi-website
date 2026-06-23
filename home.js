@@ -48,6 +48,7 @@
   function refreshResume() {
     const last = getLastPosition();
     const resumeBtn = document.getElementById("resumeBtn");
+    const startBtn = document.getElementById("startBtn");
     const continueBtn = document.getElementById("continueBtn");
     if (last && getChapter(last.chapter)) {
       resumeBtn.style.display = "inline-flex";
@@ -55,9 +56,17 @@
       resumeBtn.onclick = () => goToChapter(last.chapter, last.page);
       continueBtn.style.display = "inline-block";
       continueBtn.onclick = () => goToChapter(last.chapter, last.page);
+      // A returning reader most likely wants to continue, not restart —
+      // give "Đọc tiếp" the bold primary styling and demote "Đọc từ đầu".
+      resumeBtn.classList.add("btn-primary");
+      resumeBtn.classList.remove("btn-ghost");
+      startBtn.classList.add("btn-ghost");
+      startBtn.classList.remove("btn-primary");
     } else {
       resumeBtn.style.display = "none";
       continueBtn.style.display = "none";
+      startBtn.classList.add("btn-primary");
+      startBtn.classList.remove("btn-ghost");
     }
   }
 
