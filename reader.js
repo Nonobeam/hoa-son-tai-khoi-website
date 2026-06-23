@@ -390,19 +390,6 @@
     pendingRange = null;
   }
 
-  // Mobile browsers often auto-scroll the page to bring a fresh selection
-  // into view; that scroll can land a frame or two after we first read the
-  // range's rect, leaving the popup positioned where the selection USED to
-  // be. Recompute live from pendingRange so it tracks the selection through
-  // any such scroll, instead of freezing a stale position.
-  function positionTagPopup() {
-    if (!pendingRange) return;
-    const rect = pendingRange.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) return;
-    tagPopup.style.left = rect.left + rect.width / 2 + "px";
-    tagPopup.style.top = Math.max(rect.top - 8, 8) + "px";
-  }
-
   function handleSelection() {
     if (interactingWithPopup) return;
     const sel = window.getSelection();
@@ -418,14 +405,8 @@
       return;
     }
     pendingRange = range.cloneRange();
-    positionTagPopup();
     tagPopup.classList.add("show");
-    requestAnimationFrame(positionTagPopup);
   }
-
-  window.addEventListener("scroll", () => {
-    if (tagPopup.classList.contains("show")) positionTagPopup();
-  }, { passive: true });
 
   document.addEventListener("selectionchange", () => {
     clearTimeout(selectionTimer);

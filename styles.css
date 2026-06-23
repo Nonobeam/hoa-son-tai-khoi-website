@@ -426,17 +426,20 @@ body.reading { background: transparent; }
 }
 .to-top.show { display: flex; }
 
-/* selection-to-tag popup */
+/* selection-to-tag popup: fixed near the bottom of the screen, unaffected
+   by scrolling or where the selection happens to be on the page. */
 .tag-popup {
   position: fixed;
+  left: 50%;
+  bottom: 28px;
   display: none;
-  transform: translate(-50%, -100%);
+  transform: translateX(-50%);
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 7px 12px;
-  font-size: 13px;
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   z-index: 70;
