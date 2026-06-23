@@ -85,15 +85,21 @@
 
   let t = 0;
   let running = true;
+  let lastTime = null;
 
-  function frame() {
+  function frame(now) {
     if (!running) return;
-    t += 0.016;
+    // Normalize movement to a 60fps baseline so a janky frame (e.g. from
+    // infinite-scroll DOM growth) doesn't make petals appear to speed up
+    // when the browser catches up.
+    const dt = lastTime == null ? 1 : Math.min((now - lastTime) / (1000 / 60), 4);
+    lastTime = now;
+    t += 0.016 * dt;
     ctx.clearRect(0, 0, W, H);
     for (const p of petals) {
-      p.y += p.speedY;
-      p.x += Math.sin(t * p.swayFreq + p.phase) * 0.6;
-      p.rot += p.rotSpeed;
+      p.y += p.speedY * dt;
+      p.x += Math.sin(t * p.swayFreq + p.phase) * 0.6 * dt;
+      p.rot += p.rotSpeed * dt;
       const drawX = p.x + Math.sin(t * p.swayFreq + p.phase) * p.swayAmp;
       const saved = p.x;
       p.x = drawX;
@@ -107,7 +113,10 @@
 
   document.addEventListener("visibilitychange", () => {
     running = !document.hidden;
-    if (running) requestAnimationFrame(frame);
+    if (running) {
+      lastTime = null;
+      requestAnimationFrame(frame);
+    }
   });
 
   // Respect reduced-motion preference.

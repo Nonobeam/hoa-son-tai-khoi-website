@@ -16,10 +16,14 @@
   const drawerClose = document.getElementById("drawerClose");
   const drawerSearch = document.getElementById("drawerSearch");
   const drawerList = document.getElementById("drawerList");
+  const tagPopup = document.getElementById("tagPopup");
+  const tagToast = document.getElementById("tagToast");
+  const goToTagBtn = document.getElementById("goToTagBtn");
 
   const params = new URLSearchParams(location.search);
   const wantChapter = Number(params.get("chapter"));
   const startPage = Number(params.get("page")) || 0;
+  const gotoTag = params.get("goto") === "tag";
 
   const APPEND_THRESHOLD = 0.8; // append next chapter at 80% scroll of loaded content
   let loaded = []; // chapter numbers in render order
@@ -270,6 +274,192 @@
     });
   });
 
+  // --- Manual tag (bookmark): user selects text, taps "Đánh dấu", and the
+  // exact spot is saved as { chapter, snippet, occurrence }. Anchoring to the
+  // selected text (rather than a DOM index) survives reloads since the
+  // chapter HTML is static. ---
+  let toastTimer = null;
+  function showToast(msg) {
+    tagToast.textContent = msg;
+    tagToast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => tagToast.classList.remove("show"), 2200);
+  }
+
+  function buildTextWalk(container) {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    let fullText = "";
+    let node;
+    while ((node = walker.nextNode())) {
+      nodes.push({ node, start: fullText.length });
+      fullText += node.nodeValue;
+    }
+    return { nodes, fullText };
+  }
+
+  function globalOffset(nodes, targetNode, targetOffset) {
+    for (const n of nodes) {
+      if (n.node === targetNode) return n.start + targetOffset;
+    }
+    return null;
+  }
+
+  function countOccurrencesBefore(fullText, snippet, beforeIndex) {
+    let count = 0,
+      idx = 0;
+    for (;;) {
+      idx = fullText.indexOf(snippet, idx);
+      if (idx === -1 || idx >= beforeIndex) break;
+      count++;
+      idx += 1;
+    }
+    return count;
+  }
+
+  function findRangeForOccurrence(container, snippet, occurrence) {
+    const { nodes, fullText } = buildTextWalk(container);
+    let searchFrom = 0,
+      foundIndex = -1;
+    for (let i = 0; i <= occurrence; i++) {
+      foundIndex = fullText.indexOf(snippet, searchFrom);
+      if (foundIndex === -1) return null;
+      searchFrom = foundIndex + 1;
+    }
+    const endIndex = foundIndex + snippet.length;
+    const mapIndex = (idx) => {
+      for (const n of nodes) {
+        if (idx >= n.start && idx <= n.start + n.node.nodeValue.length) {
+          return { node: n.node, offset: idx - n.start };
+        }
+      }
+      return null;
+    };
+    const startPos = mapIndex(foundIndex);
+    const endPos = mapIndex(endIndex);
+    if (!startPos || !endPos) return null;
+    const range = document.createRange();
+    range.setStart(startPos.node, startPos.offset);
+    range.setEnd(endPos.node, endPos.offset);
+    return range;
+  }
+
+  function closestChapterText(node) {
+    const el = node.nodeType === 1 ? node : node.parentElement;
+    return el ? el.closest(".chapter-text") : null;
+  }
+
+  function updateGoToTagBtn() {
+    const tag = getTag();
+    goToTagBtn.disabled = !tag;
+    goToTagBtn.style.opacity = tag ? "1" : "0.4";
+  }
+
+  function resolveTagRange(tag) {
+    const container = reader.querySelector(`.chapter-text[data-chapter="${tag.chapter}"]`);
+    if (!container) return null;
+    return findRangeForOccurrence(container, tag.snippet, tag.occurrence);
+  }
+
+  function scrollToTag(tag, { flash = false, smooth = false } = {}) {
+    const range = resolveTagRange(tag);
+    if (!range) {
+      showToast("Không tìm thấy vị trí đã đánh dấu.");
+      clearTag();
+      updateGoToTagBtn();
+      return;
+    }
+    const rect = range.getBoundingClientRect();
+    const target = Math.max(0, window.scrollY + rect.top - window.innerHeight * 0.3);
+    window.scrollTo({ top: target, behavior: smooth ? "smooth" : "auto" });
+    if (flash) {
+      const span = document.createElement("span");
+      span.className = "tag-highlight";
+      try {
+        range.surroundContents(span);
+        setTimeout(() => {
+          const parent = span.parentNode;
+          if (!parent) return;
+          while (span.firstChild) parent.insertBefore(span.firstChild, span);
+          parent.removeChild(span);
+        }, 1700);
+      } catch (e) {
+        // Range crosses element boundaries (e.g. spans an <em>); skip the
+        // highlight, the scroll above already landed on the right spot.
+      }
+    }
+  }
+
+  let pendingRange = null;
+  let selectionTimer = null;
+
+  function hideTagPopup() {
+    tagPopup.classList.remove("show");
+    pendingRange = null;
+  }
+
+  function handleSelection() {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+      hideTagPopup();
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    const container = closestChapterText(range.startContainer);
+    const text = sel.toString().trim();
+    if (!container || text.length < 2) {
+      hideTagPopup();
+      return;
+    }
+    pendingRange = range.cloneRange();
+    const rect = range.getBoundingClientRect();
+    tagPopup.style.left = rect.left + rect.width / 2 + "px";
+    tagPopup.style.top = Math.max(rect.top - 8, 8) + "px";
+    tagPopup.classList.add("show");
+  }
+
+  document.addEventListener("selectionchange", () => {
+    clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(handleSelection, 80);
+  });
+  reader.addEventListener("mouseup", handleSelection);
+  reader.addEventListener("touchend", handleSelection);
+
+  // Keep the live selection alive when the popup itself is pressed.
+  tagPopup.addEventListener("mousedown", (e) => e.preventDefault());
+
+  tagPopup.addEventListener("click", () => {
+    if (!pendingRange) return;
+    const container = closestChapterText(pendingRange.startContainer);
+    if (!container) {
+      hideTagPopup();
+      return;
+    }
+    const chapter = Number(container.dataset.chapter);
+    const MAX_LEN = 80;
+    let snippet = pendingRange.toString().replace(/\s+/g, " ").trim();
+    hideTagPopup();
+    window.getSelection().removeAllRanges();
+    if (!snippet) return;
+    if (snippet.length > MAX_LEN) snippet = snippet.slice(0, MAX_LEN);
+    const { nodes, fullText } = buildTextWalk(container);
+    const startOffset = globalOffset(nodes, pendingRange.startContainer, pendingRange.startOffset);
+    const occurrence = startOffset == null ? 0 : countOccurrencesBefore(fullText, snippet, startOffset);
+    setTag({ chapter, snippet, occurrence });
+    updateGoToTagBtn();
+    showToast("Đã đánh dấu vị trí.");
+  });
+
+  goToTagBtn.onclick = () => {
+    const tag = getTag();
+    if (!tag) return;
+    if (loaded.includes(tag.chapter)) {
+      scrollToTag(tag, { flash: true, smooth: true });
+    } else {
+      location.href = `reader.html?chapter=${tag.chapter}&goto=tag`;
+    }
+  };
+
   async function init() {
     await loadChapters();
 
@@ -282,7 +472,12 @@
     // goToChapter). Otherwise the URL is stale → resume from the cookie.
     const last = getLastPosition();
     let ch, page;
-    if (wantChapter && getChapter(wantChapter) && (!last || last.chapter === wantChapter)) {
+    if (gotoTag && wantChapter && getChapter(wantChapter)) {
+      // A "go to tag" jump always trusts the URL chapter, even if it
+      // disagrees with the auto-tracked last position.
+      ch = getChapter(wantChapter);
+      page = 1;
+    } else if (wantChapter && getChapter(wantChapter) && (!last || last.chapter === wantChapter)) {
       ch = getChapter(wantChapter);
       page = startPage || (last && last.page) || 1;
     } else if (last && getChapter(last.chapter)) {
@@ -302,11 +497,17 @@
     buildDrawer();
     updateNav();
     applyFontSize();
+    updateGoToTagBtn();
 
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", maybeAppend);
 
-    if (page > 1) {
+    if (gotoTag) {
+      const tag = getTag();
+      if (tag && tag.chapter === ch.num) {
+        requestAnimationFrame(() => scrollToTag(tag, { flash: true }));
+      }
+    } else if (page > 1) {
       requestAnimationFrame(() => {
         const target = reader.querySelector(
           `.page-img[data-chapter="${ch.num}"][data-page="${page}"]`

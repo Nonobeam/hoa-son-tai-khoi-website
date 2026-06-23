@@ -19,10 +19,14 @@
     <span class="stat now-reading" id="nowReading"></span>
     <button class="nav-btn icon-btn" id="fontDown" title="Giảm cỡ chữ">A−</button>
     <button class="nav-btn icon-btn" id="fontUp" title="Tăng cỡ chữ">A+</button>
+    <button class="nav-btn icon-btn" id="goToTagBtn" title="Đến vị trí đã đánh dấu" disabled>📍</button>
     <button class="nav-btn" id="menuBtn" title="Mục lục">
       <span class="ic">☰</span><span class="lbl"> Mục lục</span>
     </button>
   </header>
+
+  <button class="tag-popup" id="tagPopup" type="button">🔖 Đánh dấu</button>
+  <div class="tag-toast" id="tagToast"></div>
 
   <div class="drawer-overlay" id="drawerOverlay"></div>
   <aside class="drawer" id="drawer" aria-label="Mục lục">
