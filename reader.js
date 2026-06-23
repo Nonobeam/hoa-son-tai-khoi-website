@@ -322,6 +322,7 @@
 
   let pendingRange = null;
   let selectionTimer = null;
+  let interactingWithPopup = false;
 
   function hideTagPopup() {
     tagPopup.classList.remove("show");
@@ -329,6 +330,7 @@
   }
 
   function handleSelection() {
+    if (interactingWithPopup) return;
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
       hideTagPopup();
@@ -355,10 +357,18 @@
   reader.addEventListener("mouseup", handleSelection);
   reader.addEventListener("touchend", handleSelection);
 
-  // Keep the live selection alive when the popup itself is pressed.
-  tagPopup.addEventListener("mousedown", (e) => e.preventDefault());
+  // Once the user starts pressing the popup, lock out handleSelection() so a
+  // selection collapsing under the tap (native on touch, occasional on
+  // desktop) can't null pendingRange before the click/tap is processed.
+  function lockPopup(e) {
+    e.preventDefault();
+    interactingWithPopup = true;
+  }
+  tagPopup.addEventListener("mousedown", lockPopup);
+  tagPopup.addEventListener("touchstart", lockPopup, { passive: false });
 
   tagPopup.addEventListener("click", () => {
+    interactingWithPopup = false;
     if (!pendingRange) return;
     const container = closestChapterText(pendingRange.startContainer);
     if (!container) {
