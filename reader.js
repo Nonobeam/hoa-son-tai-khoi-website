@@ -320,8 +320,70 @@
     return el ? el.closest(".chapter-text") : null;
   }
 
+  function findRangeForOccurrence(container, snippet, occurrence) {
+    const { nodes, fullText } = buildTextWalk(container);
+    let searchFrom = 0,
+      foundIndex = -1;
+    for (let i = 0; i <= occurrence; i++) {
+      foundIndex = fullText.indexOf(snippet, searchFrom);
+      if (foundIndex === -1) return null;
+      searchFrom = foundIndex + 1;
+    }
+    const endIndex = foundIndex + snippet.length;
+    const mapIndex = (idx) => {
+      for (const n of nodes) {
+        if (idx >= n.start && idx <= n.start + n.node.nodeValue.length) {
+          return { node: n.node, offset: idx - n.start };
+        }
+      }
+      return null;
+    };
+    const startPos = mapIndex(foundIndex);
+    const endPos = mapIndex(endIndex);
+    if (!startPos || !endPos) return null;
+    const range = document.createRange();
+    range.setStart(startPos.node, startPos.offset);
+    range.setEnd(endPos.node, endPos.offset);
+    return range;
+  }
+
+  function resolveTagRange(tag) {
+    const container = reader.querySelector(`.chapter-text[data-chapter="${tag.chapter}"]`);
+    if (!container) return null;
+    return findRangeForOccurrence(container, tag.snippet, tag.occurrence);
+  }
+
+  function scrollToTag(tag, { flash = false } = {}) {
+    const range = resolveTagRange(tag);
+    if (!range) {
+      clearTag();
+      return false;
+    }
+    const rect = range.getBoundingClientRect();
+    const target = Math.max(0, window.scrollY + rect.top - window.innerHeight * 0.3);
+    window.scrollTo({ top: target, behavior: "auto" });
+    if (flash) {
+      const span = document.createElement("span");
+      span.className = "tag-highlight";
+      try {
+        range.surroundContents(span);
+        setTimeout(() => {
+          const parent = span.parentNode;
+          if (!parent) return;
+          while (span.firstChild) parent.insertBefore(span.firstChild, span);
+          parent.removeChild(span);
+        }, 1700);
+      } catch (e) {
+        // Range crosses element boundaries (e.g. spans an <em>); skip the
+        // highlight, the scroll above already landed on the right spot.
+      }
+    }
+    return true;
+  }
+
   let pendingRange = null;
   let selectionTimer = null;
+  let interactingWithPopup = false;
 
   function hideTagPopup() {
     tagPopup.classList.remove("show");
@@ -329,6 +391,7 @@
   }
 
   function handleSelection() {
+    if (interactingWithPopup) return;
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
       hideTagPopup();
@@ -355,10 +418,18 @@
   reader.addEventListener("mouseup", handleSelection);
   reader.addEventListener("touchend", handleSelection);
 
-  // Keep the live selection alive when the popup itself is pressed.
-  tagPopup.addEventListener("mousedown", (e) => e.preventDefault());
+  // Once the user starts pressing the popup, lock out handleSelection() so a
+  // selection collapsing under the tap (native on touch, occasional on
+  // desktop) can't null pendingRange before the click/tap is processed.
+  function lockPopup(e) {
+    e.preventDefault();
+    interactingWithPopup = true;
+  }
+  tagPopup.addEventListener("mousedown", lockPopup);
+  tagPopup.addEventListener("touchstart", lockPopup, { passive: false });
 
   tagPopup.addEventListener("click", () => {
+    interactingWithPopup = false;
     if (!pendingRange) return;
     const container = closestChapterText(pendingRange.startContainer);
     if (!container) {
@@ -415,7 +486,21 @@
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", maybeAppend);
 
-    if (page > 1) {
+    // The tag is a single saved spot, independent of the auto-tracked last
+    // position. It only wins when it's still inside the chapter we're
+    // resuming into — if reading has since moved past that chapter, the
+    // resumed (further-along) position takes priority over the old tag.
+    const tag = getTag();
+    if (tag && tag.chapter === ch.num) {
+      requestAnimationFrame(() => {
+        if (!scrollToTag(tag, { flash: true }) && page > 1) {
+          const target = reader.querySelector(
+            `.page-img[data-chapter="${ch.num}"][data-page="${page}"]`
+          );
+          if (target) target.scrollIntoView();
+        }
+      });
+    } else if (page > 1) {
       requestAnimationFrame(() => {
         const target = reader.querySelector(
           `.page-img[data-chapter="${ch.num}"][data-page="${page}"]`
