@@ -78,6 +78,28 @@ function readCount() {
   return Object.keys(loadProgress().read).length;
 }
 
+// --- Manual bookmark ("tag"): a single, user-picked spot anchored to a text
+// selection, independent of the auto-tracked last-read position above. ---
+const TAG_COOKIE = "hstk_tag";
+
+function setTag(tag) {
+  setCookie(TAG_COOKIE, JSON.stringify(tag), COOKIE_DAYS);
+}
+
+function getTag() {
+  const raw = getCookie(TAG_COOKIE);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearTag() {
+  setCookie(TAG_COOKIE, "", -1);
+}
+
 // --- Reading font size (separate cookie) ---
 const FONT_COOKIE = "hstk_fontsize";
 const FONT_MIN = 14;
