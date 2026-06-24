@@ -1,19 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="petal" x1="0%" y1="0%" x2="0%" y2="100%">
+    <linearGradient id="petal" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#f43f5e"/>
       <stop offset="100%" stop-color="#e11d48"/>
     </linearGradient>
   </defs>
   <circle cx="32" cy="32" r="31" fill="#0b0e14"/>
-  <g transform="translate(32,32)">
-    <g id="petals">
-      <path d="M0,-4 C7,-12 7,-24 0,-29 C-7,-24 -7,-12 0,-4 Z" fill="url(#petal)"/>
-    </g>
-    <use href="#petals" transform="rotate(72)"/>
-    <use href="#petals" transform="rotate(144)"/>
-    <use href="#petals" transform="rotate(216)"/>
-    <use href="#petals" transform="rotate(288)"/>
-    <circle r="4.5" fill="#fff7ed"/>
+
+  <!-- wind swooshes trailing behind the petal, suggesting motion -->
+  <g stroke="#f43f5e" stroke-linecap="round" fill="none" opacity="0.4">
+    <path d="M10,20 C16,17 22,17 27,20" stroke-width="2"/>
+    <path d="M8,28 C15,25 22,26 28,29" stroke-width="1.6"/>
+  </g>
+
+  <!-- a single petal, tilted and twisted as if caught mid-flutter -->
+  <g transform="translate(34,33) rotate(-32)">
+    <path d="M0,-19
+             C9,-15 13,-4 9,7
+             C6,15 -1,18 -5,12
+             C-10,5 -9,-9 -3,-17
+             C-2,-18.5 -1,-19 0,-19 Z"
+          fill="url(#petal)"/>
+    <path d="M-1,-15 C3,-7 4,3 -1,12"
+          stroke="rgba(255,247,237,0.55)" stroke-width="1" fill="none"
+          stroke-linecap="round"/>
   </g>
 </svg>
