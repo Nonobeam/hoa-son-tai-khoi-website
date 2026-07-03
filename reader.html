@@ -27,7 +27,29 @@
     </button>
   </header>
 
-  <button class="tag-popup" id="tagPopup" type="button">Đánh dấu</button>
+  <!-- Floating action menu (bottom-left) -->
+  <div class="fab" id="fab">
+    <div class="fab-items">
+      <button class="fab-item" id="fabSearch" title="Tìm trong trang">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="8.5" cy="8.5" r="5.5"/><line x1="13" y1="13" x2="18" y2="18"/></svg>
+      </button>
+      <button class="fab-item" id="fabTag" title="Đánh dấu vị trí">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2h10a1 1 0 0 1 1 1v15l-6-4-6 4V3a1 1 0 0 1 1-1z"/></svg>
+      </button>
+    </div>
+    <button class="fab-hub" id="fabHub" title="Menu">+</button>
+  </div>
+
+  <!-- Slide-down in-page search bar -->
+  <div class="search-bar" id="searchBar">
+    <button class="search-bar-btn" id="searchClose">✕</button>
+    <input class="search-bar-input" id="searchInput" type="search"
+           placeholder="Tìm trong trang…" autocomplete="off" />
+    <span class="search-bar-count" id="searchCount"></span>
+    <button class="search-bar-btn" id="searchPrev" title="Kết quả trước">↑</button>
+    <button class="search-bar-btn" id="searchNext" title="Kết quả tiếp">↓</button>
+  </div>
+
   <div class="tag-toast" id="tagToast"></div>
 
   <div class="drawer-overlay" id="drawerOverlay"></div>

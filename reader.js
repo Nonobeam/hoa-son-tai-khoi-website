@@ -16,8 +16,17 @@
   const drawerClose = document.getElementById("drawerClose");
   const drawerSearch = document.getElementById("drawerSearch");
   const drawerList = document.getElementById("drawerList");
-  const tagPopup = document.getElementById("tagPopup");
   const tagToast = document.getElementById("tagToast");
+  const fab = document.getElementById("fab");
+  const fabHub = document.getElementById("fabHub");
+  const fabTag = document.getElementById("fabTag");
+  const fabSearch = document.getElementById("fabSearch");
+  const searchBar = document.getElementById("searchBar");
+  const searchInput = document.getElementById("searchInput");
+  const searchCount = document.getElementById("searchCount");
+  const searchPrev = document.getElementById("searchPrev");
+  const searchNext = document.getElementById("searchNext");
+  const searchClose = document.getElementById("searchClose");
 
   const params = new URLSearchParams(location.search);
   const wantChapter = Number(params.get("chapter"));
@@ -381,31 +390,128 @@
     return true;
   }
 
+  // ─── FAB open/close ───────────────────────────────────────────────────────
+  let fabOpen = false;
+  function openFab() { fabOpen = true; fab.classList.add("open"); }
+  function closeFab() { fabOpen = false; fab.classList.remove("open"); }
+  fabHub.addEventListener("click", () => fabOpen ? closeFab() : openFab());
+
+  // Close FAB when clicking outside it, but not inside the reader (those
+  // clicks may be text selections that immediately re-open it anyway).
+  document.addEventListener("click", (e) => {
+    if (!fabOpen) return;
+    if (fab.contains(e.target) || reader.contains(e.target)) return;
+    closeFab();
+  }, true);
+
+  // ─── In-page search ───────────────────────────────────────────────────────
+  let searchHighlights = [];
+  let searchMatchIdx = -1;
+
+  function clearSearchHighlights() {
+    for (const sp of searchHighlights) {
+      const parent = sp.parentNode;
+      if (!parent) continue;
+      while (sp.firstChild) parent.insertBefore(sp.firstChild, sp);
+      parent.removeChild(sp);
+      parent.normalize();
+    }
+    searchHighlights = [];
+    searchMatchIdx = -1;
+  }
+
+  function openSearch() {
+    closeFab();
+    searchBar.classList.add("open");
+    requestAnimationFrame(() => searchInput.focus());
+  }
+
+  function closeSearch() {
+    searchBar.classList.remove("open");
+    clearSearchHighlights();
+    searchInput.value = "";
+    searchCount.textContent = "";
+  }
+
+  function runSearch(query) {
+    clearSearchHighlights();
+    if (!query) { searchCount.textContent = ""; return; }
+    const q = query.toLowerCase();
+    for (const cont of reader.querySelectorAll(".chapter-text")) {
+      const { nodes, fullText } = buildTextWalk(cont);
+      const lower = fullText.toLowerCase();
+      let idx = 0;
+      for (;;) {
+        const pos = lower.indexOf(q, idx);
+        if (pos === -1) break;
+        const mapIdx = (offset) => {
+          for (const n of nodes)
+            if (offset >= n.start && offset <= n.start + n.node.nodeValue.length)
+              return { node: n.node, offset: offset - n.start };
+          return null;
+        };
+        const s = mapIdx(pos), e = mapIdx(pos + query.length);
+        if (s && e) {
+          const range = document.createRange();
+          range.setStart(s.node, s.offset);
+          range.setEnd(e.node, e.offset);
+          const span = document.createElement("span");
+          span.className = "search-hl";
+          try { range.surroundContents(span); searchHighlights.push(span); } catch (_) {}
+        }
+        idx = pos + 1;
+      }
+    }
+    if (searchHighlights.length) goToSearchMatch(0);
+    else searchCount.textContent = "Không tìm thấy";
+  }
+
+  function goToSearchMatch(idx) {
+    if (!searchHighlights.length) return;
+    if (searchMatchIdx >= 0) searchHighlights[searchMatchIdx].classList.remove("current");
+    searchMatchIdx = ((idx % searchHighlights.length) + searchHighlights.length) % searchHighlights.length;
+    const el = searchHighlights[searchMatchIdx];
+    el.classList.add("current");
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    searchCount.textContent = `${searchMatchIdx + 1} / ${searchHighlights.length}`;
+  }
+
+  let searchTimer = null;
+  searchInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => runSearch(searchInput.value.trim()), 200);
+  });
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") goToSearchMatch(searchMatchIdx + (e.shiftKey ? -1 : 1));
+    if (e.key === "Escape") closeSearch();
+  });
+  searchNext.addEventListener("click", () => goToSearchMatch(searchMatchIdx + 1));
+  searchPrev.addEventListener("click", () => goToSearchMatch(searchMatchIdx - 1));
+  searchClose.addEventListener("click", closeSearch);
+  fabSearch.addEventListener("mousedown", (e) => e.preventDefault());
+  fabSearch.addEventListener("click", openSearch);
+
+  // ─── Tag (save selected position) ─────────────────────────────────────────
   let pendingRange = null;
   let selectionTimer = null;
   let interactingWithPopup = false;
 
-  function hideTagPopup() {
-    tagPopup.classList.remove("show");
+  function clearPendingTag() {
+    fabTag.classList.remove("available");
     pendingRange = null;
   }
 
   function handleSelection() {
     if (interactingWithPopup) return;
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
-      hideTagPopup();
-      return;
-    }
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) { clearPendingTag(); return; }
     const range = sel.getRangeAt(0);
     const container = closestChapterText(range.startContainer);
     const text = sel.toString().trim();
-    if (!container || text.length < 2) {
-      hideTagPopup();
-      return;
-    }
+    if (!container || text.length < 2) { clearPendingTag(); return; }
     pendingRange = range.cloneRange();
-    tagPopup.classList.add("show");
+    fabTag.classList.add("available");
+    openFab();
   }
 
   document.addEventListener("selectionchange", () => {
@@ -415,22 +521,17 @@
   reader.addEventListener("mouseup", handleSelection);
   reader.addEventListener("touchend", handleSelection);
 
-  // Once the user starts pressing the popup, lock out handleSelection() so a
-  // selection collapsing under the tap (native on touch, occasional on
-  // desktop) can't null pendingRange before the click/tap is processed.
-  function lockPopup(e) {
-    e.preventDefault();
-    interactingWithPopup = true;
-  }
-  tagPopup.addEventListener("mousedown", lockPopup);
-  tagPopup.addEventListener("touchstart", lockPopup, { passive: false });
+  fabTag.addEventListener("mousedown", (e) => { e.preventDefault(); interactingWithPopup = true; });
+  fabTag.addEventListener("touchstart", (e) => { e.preventDefault(); interactingWithPopup = true; }, { passive: false });
 
-  tagPopup.addEventListener("click", () => {
+  fabTag.addEventListener("click", () => {
     interactingWithPopup = false;
+    if (!fabTag.classList.contains("available")) return;
     const range = pendingRange;
     if (!range) return;
     const container = closestChapterText(range.startContainer);
-    hideTagPopup();
+    clearPendingTag();
+    closeFab();
     window.getSelection().removeAllRanges();
     if (!container) return;
     const chapter = Number(container.dataset.chapter);
