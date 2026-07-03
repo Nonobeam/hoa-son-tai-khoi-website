@@ -426,27 +426,145 @@ body.reading { background: transparent; }
 }
 .to-top.show { display: flex; }
 
-/* selection-to-tag popup: fixed near the bottom of the screen, unaffected
-   by scrolling or where the selection happens to be on the page. */
-.tag-popup {
+/* ---------- Floating action menu (FAB) ---------- */
+.fab {
   position: fixed;
-  left: 50%;
-  bottom: 28px;
-  display: none;
-  transform: translateX(-50%);
+  bottom: 24px;
+  left: 24px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.fab-hub {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 999px;
-  padding: 10px 20px;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 26px;
+  line-height: 1;
   cursor: pointer;
-  z-index: 70;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  transition: transform 0.3s cubic-bezier(.4,0,.2,1), background 0.2s;
+  position: relative;
+  z-index: 1;
 }
-.tag-popup.show { display: block; }
+.fab-hub:hover { background: var(--accent-soft); }
+.fab.open .fab-hub { transform: rotate(135deg); }
+
+.fab-items {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.fab-item {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(12px) scale(0.8);
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease,
+              background 0.15s, color 0.15s;
+}
+.fab-item svg { width: 18px; height: 18px; }
+.fab.open .fab-item {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+/* stagger: tag (child 2) appears slightly before search (child 1) */
+.fab.open .fab-item:nth-child(2) { transition-delay: 0.04s; }
+.fab.open .fab-item:nth-child(1) { transition-delay: 0.10s; }
+
+.fab-item:hover { background: #232c40; color: var(--text); }
+/* tag button lights up when text is selected */
+#fabTag.available { background: var(--accent); color: #fff; border-color: var(--accent); }
+#fabTag.available:hover { background: var(--accent-soft); }
+/* dim tag when unavailable */
+#fabTag:not(.available) { opacity: 0; }
+.fab.open #fabTag:not(.available) { opacity: 0.4; }
+
+/* ---------- In-page search bar ---------- */
+.search-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 65;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateY(-100%);
+  transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+.search-bar.open { transform: translateY(0); }
+.search-bar-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+  min-width: 0;
+}
+.search-bar-input:focus { border-color: var(--accent); }
+.search-bar-count {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 56px;
+  text-align: center;
+}
+.search-bar-btn {
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 11px;
+  cursor: pointer;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.search-bar-btn:hover { background: #232c40; }
+/* highlight all matches */
+.search-hl {
+  background: rgba(225, 29, 72, 0.22);
+  border-radius: 2px;
+  outline: 1px solid rgba(225, 29, 72, 0.35);
+}
+.search-hl.current {
+  background: rgba(225, 29, 72, 0.6);
+  color: #fff;
+  outline-color: var(--accent);
+}
 
 .tag-highlight {
   animation: tagFlash 1.7s ease-out;
