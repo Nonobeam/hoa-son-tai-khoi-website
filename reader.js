@@ -128,12 +128,30 @@
     }
   }
 
+  let lastScrollY = 0;
+  let scrollDownAcc = 0; // accumulated downward distance since last upward movement
+  const SCROLL_HIDE_THRESHOLD = 80; // px scrolled down before hiding UI
+
   function updateReadingState() {
     const doc = document.documentElement;
     const max = doc.scrollHeight - window.innerHeight;
     const pct = max > 0 ? Math.min(100, (window.scrollY / max) * 100) : 0;
     progressBar.style.width = pct + "%";
-    toTop.classList.toggle("show", window.scrollY > 800);
+
+    const dy = window.scrollY - lastScrollY;
+    lastScrollY = window.scrollY;
+    if (dy > 0) {
+      scrollDownAcc += dy;
+      if (scrollDownAcc > SCROLL_HIDE_THRESHOLD) {
+        fab.classList.add("ui-hidden");
+        toTop.classList.remove("show");
+        if (fabOpen) closeFab();
+      }
+    } else if (dy < 0) {
+      scrollDownAcc = 0;
+      fab.classList.remove("ui-hidden");
+      toTop.classList.toggle("show", window.scrollY > 800);
+    }
 
     const blocks = reader.querySelectorAll(".chapter-block");
     const probe = window.scrollY + window.innerHeight * 0.35;
@@ -396,11 +414,12 @@
   function closeFab() { fabOpen = false; fab.classList.remove("open"); }
   fabHub.addEventListener("click", () => fabOpen ? closeFab() : openFab());
 
-  // Close FAB when clicking outside it, but not inside the reader (those
-  // clicks may be text selections that immediately re-open it anyway).
+  // Close FAB on click outside. Only spare reader clicks while a text
+  // selection is live (user may be adjusting the selection range).
   document.addEventListener("click", (e) => {
     if (!fabOpen) return;
-    if (fab.contains(e.target) || reader.contains(e.target)) return;
+    if (fab.contains(e.target)) return;
+    if (pendingRange && reader.contains(e.target)) return;
     closeFab();
   }, true);
 
