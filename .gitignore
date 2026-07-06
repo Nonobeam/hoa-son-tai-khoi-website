@@ -13,3 +13,11 @@ content/img/
 .DS_Store
 .idea/
 .vscode/
+
+# Tooling — keep only the html/css/js site in the repo
+# Python scripts (OCR / extraction / cleanup pipeline)
+*.py
+# Shell scripts
+*.sh
+# Claude Code skill / commands
+.claude/
