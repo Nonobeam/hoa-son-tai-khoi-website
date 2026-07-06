@@ -20,16 +20,26 @@ CONTENT  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "content")
 NOISE = re.compile(
     r"vlognovel|bản dịch được thực hiện|a-h team|"
     r"đăng tải độc quyền|đón xem bản dịch|"
-    r"hoasontai|@hoason|trang web giải trí",
+    r"hoasontai|@hoason|trang web giải trí|"
+    r"tài khoản|ngân hàng|mb bank|ib (page|mình)|nhận \d+k",
     re.IGNORECASE,
 )
 # Strip any URL fragments embedded mid-sentence by OCR (watermark burned into image)
-URL_STRIP = re.compile(r'https?://\S*|www\.\S+|htfips?://\S*', re.IGNORECASE)
+URL_STRIP = re.compile(r"https?://\S*|www\.\S+|htfips?://\S*", re.IGNORECASE)
 
-CHAP_HEADER  = re.compile(r"^\s*(?:Hoa\s+Sơn|chapter)\s", re.IGNORECASE)
-OPEN_QUOTE   = re.compile(r'^[“”‘]')
-CLOSE_QUOTE  = re.compile(r'[”’"]$')
-SENTENCE_END = re.compile(r'[.!?]$')
+# Unicode chars that never appear in Vietnamese fiction — strip inline
+INLINE_GARBAGE = re.compile(r"[®©œ«»Š\^\x0c\x00-\x08\x0e-\x1f]|`")
+
+# Isolated 1-2 ASCII-only tokens surrounded by spaces/punctuation (OCR watermark noise)
+ISOLATED_TOKEN = re.compile(r"(?:^|\s)([A-Za-z]{1,2})(?=\s|[!?.,]|$)")
+
+# 4+ repeated same character = OCR noise (e.g. “Vùuuuuu”, “aaaaa”)
+REPEATED_CHAR  = re.compile(r"(.)\1{3,}")
+
+CHAP_HEADER  = re.compile(r"^\s*[^a-zA-ZÀ-ỿ]*\s*(?:Hoa\s+Sơn|chapter)\s", re.IGNORECASE)
+OPEN_QUOTE   = re.compile(r"^[“”’]")
+CLOSE_QUOTE  = re.compile(r"[“’”]$")
+SENTENCE_END = re.compile(r"[.!?]$")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -53,8 +63,23 @@ def is_image_pdf(path: str) -> bool:
 
 
 def is_garbage(ln: str) -> bool:
-    """Short ASCII-only lines are URL watermark fragments (e.g. 'tp', 'ht', '//w')."""
-    return bool(ln) and len(ln) <= 6 and not re.search(r'[À-ỿ]', ln)
+    """Detect watermark fragments and OCR noise lines."""
+    if not ln:
+        return False
+    # Short lines with no Vietnamese chars
+    if len(ln) <= 6 and not re.search(r'[À-ỿ]', ln):
+        return True
+    # Lines with ≥2 garbage Unicode symbols (e.g. "œ® ùu. ^ cŠ Vùuuuu")
+    if len(INLINE_GARBAGE.findall(ln)) >= 2:
+        return True
+    # Lines with 4+ repeated same character (OCR hallucination)
+    if REPEATED_CHAR.search(ln):
+        return True
+    # Lines where >40% of chars are non-Vietnamese, non-Latin (dense symbol noise)
+    bad = len(re.findall(r'[^a-zA-ZÀ-ỿ0-9\s.,!?;:()\-\'"""''…–—/*]', ln))
+    if bad >= 4 and bad / len(ln) > 0.4:
+        return True
+    return False
 
 
 # ── text-PDF path ─────────────────────────────────────────────────────────────
@@ -84,7 +109,9 @@ def build_paragraphs(raw_lines: list[str]) -> list[str]:
 
     for raw in raw_lines:
         ln = raw.replace("\xa0", " ").strip()
-        ln = URL_STRIP.sub("", ln).strip()  # strip watermark URLs burned into OCR images
+        ln = URL_STRIP.sub("", ln).strip()       # strip watermark URLs
+        ln = INLINE_GARBAGE.sub("", ln).strip()  # strip ®©œ«» and control chars
+        ln = re.sub(r'\s{2,}', ' ', ln)          # collapse extra spaces
         if not ln:
             prev_blank = True
             continue
@@ -132,7 +159,7 @@ def ocr_pdf(path: str) -> list[str]:
     with tempfile.TemporaryDirectory() as tmp:
         for i in range(doc.page_count):
             page    = doc[i]
-            mat     = fitz.Matrix(2, 2)          # 2× zoom → ~150 DPI render
+            mat     = fitz.Matrix(3, 3)          # 3× zoom → ~225 DPI render, better OCR accuracy
             pix     = page.get_pixmap(matrix=mat)
             img_out = os.path.join(tmp, f"p{i:04d}.png")
             pix.save(img_out)
@@ -228,8 +255,9 @@ def main():
 
 
 def _find_corrupted(start: int, end: int) -> list[int]:
-    """Return chapter numbers whose HTML has ≥3 short ASCII junk paragraphs."""
-    SHORT_P = re.compile(r'<p>(?:<em>)?(.{1,5})(?:</em>)?</p>')
+    """Return chapter numbers whose HTML shows any sign of OCR garbage."""
+    SHORT_P    = re.compile(r'<p>(?:<em>)?(.{1,5})(?:</em>)?</p>')
+    OCR_SYMBOL = re.compile(r'[®©œ«»Š]')   # garbage Unicode never in Vietnamese fiction
     found = []
     for fn in sorted(os.listdir(CONTENT)):
         m = re.match(r'^(\d+)\.html$', fn)
@@ -239,9 +267,12 @@ def _find_corrupted(start: int, end: int) -> list[int]:
         if not (start <= num <= end):
             continue
         text = open(os.path.join(CONTENT, fn), encoding='utf-8').read()
+        # Old-style junk: ≥3 short ASCII-only <p> tags
         junk = [p for p in SHORT_P.findall(text)
                 if len(p.strip()) <= 4 and not re.search(r'[À-ỿ]', p)]
-        if len(junk) >= 3:
+        # New-style junk: OCR garbage symbols present anywhere in the file
+        has_ocr_symbols = bool(OCR_SYMBOL.search(text))
+        if len(junk) >= 3 or has_ocr_symbols:
             found.append(num)
     return found
 
