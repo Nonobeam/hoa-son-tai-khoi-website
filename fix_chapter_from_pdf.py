@@ -20,9 +20,11 @@ CONTENT  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "content")
 NOISE = re.compile(
     r"vlognovel|bản dịch được thực hiện|a-h team|"
     r"đăng tải độc quyền|đón xem bản dịch|"
-    r"hoasontaikhoifull|@hoason|trang web giải trí",
+    r"hoasontai|@hoason|trang web giải trí",
     re.IGNORECASE,
 )
+# Strip any URL fragments embedded mid-sentence by OCR (watermark burned into image)
+URL_STRIP = re.compile(r'https?://\S*|www\.\S+|htfips?://\S*', re.IGNORECASE)
 
 CHAP_HEADER  = re.compile(r"^\s*(?:Hoa\s+Sơn|chapter)\s", re.IGNORECASE)
 OPEN_QUOTE   = re.compile(r'^[“”‘]')
@@ -82,6 +84,7 @@ def build_paragraphs(raw_lines: list[str]) -> list[str]:
 
     for raw in raw_lines:
         ln = raw.replace("\xa0", " ").strip()
+        ln = URL_STRIP.sub("", ln).strip()  # strip watermark URLs burned into OCR images
         if not ln:
             prev_blank = True
             continue
