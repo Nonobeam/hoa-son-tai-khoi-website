@@ -21,3 +21,6 @@ content/img/
 *.sh
 # Claude Code skill / commands
 .claude/
+
+# Raw source material (1.3G) — mirror lives on server ~/Work/hoason
+hoason/
