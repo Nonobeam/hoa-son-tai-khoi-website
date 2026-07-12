@@ -305,11 +305,12 @@
   // chapter HTML is static. ---
   let toastTimer = null;
   function showToast(msg, type = "success") {
-    tagToast.textContent = msg;
-    tagToast.classList.remove("success", "error", "show");
-    tagToast.classList.add(type, "show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => tagToast.classList.remove("show"), type === "error" ? 3000 : 2000);
+    tagToast.textContent = msg;
+    tagToast.className = "tag-toast " + type;  // drop "show" so transition restarts
+    void tagToast.offsetHeight;                 // force reflow — makes transition fire
+    tagToast.classList.add("show");
+    toastTimer = setTimeout(() => tagToast.classList.remove("show"), type === "error" ? 3200 : 2000);
   }
 
   function buildTextWalk(container) {
