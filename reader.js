@@ -304,11 +304,12 @@
   // selected text (rather than a DOM index) survives reloads since the
   // chapter HTML is static. ---
   let toastTimer = null;
-  function showToast(msg) {
+  function showToast(msg, type = "success") {
     tagToast.textContent = msg;
-    tagToast.classList.add("show");
+    tagToast.classList.remove("success", "error", "show");
+    tagToast.classList.add(type, "show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => tagToast.classList.remove("show"), 2200);
+    toastTimer = setTimeout(() => tagToast.classList.remove("show"), type === "error" ? 3000 : 2000);
   }
 
   function buildTextWalk(container) {
@@ -545,24 +546,40 @@
 
   fabTag.addEventListener("click", () => {
     interactingWithPopup = false;
-    if (!fabTag.classList.contains("available")) return;
+    if (!fabTag.classList.contains("available")) {
+      showToast("Hãy chọn đoạn văn bản trước khi lưu.", "error");
+      return;
+    }
     const range = pendingRange;
-    if (!range) return;
+    if (!range) {
+      showToast("Không có vị trí nào được chọn.", "error");
+      return;
+    }
     const container = closestChapterText(range.startContainer);
     clearPendingTag();
     closeFab();
     window.getSelection().removeAllRanges();
-    if (!container) return;
+    if (!container) {
+      showToast("Không tìm thấy vị trí hợp lệ trong chương.", "error");
+      return;
+    }
     const chapter = Number(container.dataset.chapter);
     const MAX_LEN = 80;
     let snippet = range.toString().replace(/\s+/g, " ").trim();
-    if (!snippet) return;
+    if (!snippet) {
+      showToast("Đoạn văn bản được chọn trống.", "error");
+      return;
+    }
     if (snippet.length > MAX_LEN) snippet = snippet.slice(0, MAX_LEN);
     const { nodes, fullText } = buildTextWalk(container);
     const startOffset = globalOffset(nodes, range.startContainer, range.startOffset);
     const occurrence = startOffset == null ? 0 : countOccurrencesBefore(fullText, snippet, startOffset);
-    setTag({ chapter, snippet, occurrence });
-    showToast("Đã thêm đánh dấu.");
+    try {
+      setTag({ chapter, snippet, occurrence });
+      showToast("Đã lưu đánh dấu.", "success");
+    } catch (e) {
+      showToast("Lưu thất bại: " + e.message, "error");
+    }
   });
 
   async function init() {
