@@ -543,7 +543,7 @@
   reader.addEventListener("touchend", handleSelection);
 
   fabTag.addEventListener("mousedown", (e) => { e.preventDefault(); interactingWithPopup = true; });
-  fabTag.addEventListener("touchstart", (e) => { e.preventDefault(); interactingWithPopup = true; }, { passive: false });
+  fabTag.addEventListener("touchstart", () => { interactingWithPopup = true; });
 
   fabTag.addEventListener("click", () => {
     interactingWithPopup = false;
